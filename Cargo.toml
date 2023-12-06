@@ -1,0 +1,4 @@
+[workspace]
+members = [
+    "src/recommendation_system_backend",
+]

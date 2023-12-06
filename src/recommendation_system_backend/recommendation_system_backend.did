@@ -1,0 +1,75 @@
+type Error = variant { NotFound : record { msg : text } };
+type Item = record {
+  id : nat64;
+  updated_at : opt nat64;
+  name : text;
+  description : text;
+  created_at : nat64;
+  category : text;
+};
+type ItemPayload = record { name : text; description : text; category : text };
+type RecommendationSystem = record {
+  id : nat64;
+  users : vec User;
+  user_preferences : vec UserPreference;
+  items : vec Item;
+};
+type Result = variant { Ok : Item; Err : Error };
+type Result_1 = variant { Ok : RecommendationSystem; Err : Error };
+type Result_2 = variant { Ok : User; Err : Error };
+type Result_3 = variant { Ok : UserPreference; Err : Error };
+type Result_4 = variant { Ok; Err : Error };
+type Result_5 = variant { Ok : vec Item; Err : Error };
+type Result_6 = variant { Ok : vec RecommendationSystem; Err : Error };
+type Result_7 = variant { Ok : vec UserPreference; Err : Error };
+type Result_8 = variant { Ok : vec User; Err : Error };
+type User = record {
+  id : nat64;
+  updated_at : opt nat64;
+  password : text;
+  name : text;
+  created_at : nat64;
+  email : text;
+};
+type UserPayload = record { password : text; name : text; email : text };
+type UserPreference = record {
+  id : nat64;
+  updated_at : opt nat64;
+  created_at : nat64;
+  user_id : nat64;
+  rating : nat64;
+  item_id : nat64;
+};
+type UserPreferencePayload = record {
+  user_id : nat64;
+  rating : nat64;
+  item_id : nat64;
+};
+service : {
+  add_item : (ItemPayload) -> (Result);
+  add_item_to_recommendation_system : (nat64, nat64) -> (Result_1);
+  add_recommendation_system : () -> (Result_1);
+  add_user : (UserPayload) -> (Result_2);
+  add_user_preference : (UserPreferencePayload) -> (Result_3);
+  add_user_preference_to_recommendation_system : (nat64, nat64) -> (Result_1);
+  add_user_to_recommendation_system : (nat64, nat64) -> (Result_1);
+  delete_item : (nat64) -> (Result_4);
+  delete_recommendation_system : (nat64) -> (Result_1);
+  delete_user : (nat64) -> (Result_4);
+  delete_user_preference : (nat64) -> (Result_4);
+  get_item_by_id : (nat64) -> (Result) query;
+  get_items : () -> (Result_5) query;
+  get_items_in_recommendation_system : (nat64) -> (Result_5) query;
+  get_recommendation_system_by_id : (nat64) -> (Result_1) query;
+  get_recommendation_systems : () -> (Result_6) query;
+  get_user_by_id : (nat64) -> (Result_2) query;
+  get_user_preference_by_id : (nat64) -> (Result_3) query;
+  get_user_preferences : () -> (Result_7) query;
+  get_user_preferences_in_recommendation_system : (nat64) -> (Result_7) query;
+  get_users : () -> (Result_8) query;
+  get_users_in_recommendation_system : (nat64) -> (Result_8) query;
+  update_item : (nat64, ItemPayload) -> (Result);
+  update_recommendation_system : (nat64) -> (Result_1);
+  update_user : (nat64, UserPayload) -> (Result_2);
+  update_user_preference : (nat64, UserPreferencePayload) -> (Result_3);
+}

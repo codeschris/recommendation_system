@@ -1,0 +1,30 @@
+{
+  "canisters": {
+    "recommendation_system_backend": {
+      "candid": "src/recommendation_system_backend/recommendation_system_backend.did",
+      "package": "recommendation_system_backend",
+      "type": "rust"
+    },
+    "recommendation_system_frontend": {
+      "dependencies": [
+        "recommendation_system_backend"
+      ],
+      "frontend": {
+        "entrypoint": "src/recommendation_system_frontend/src/index.html"
+      },
+      "source": [
+        "src/recommendation_system_frontend/assets",
+        "dist/recommendation_system_frontend/"
+      ],
+      "type": "assets"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}
