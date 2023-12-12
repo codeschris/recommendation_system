@@ -1,7 +1,12 @@
-type Error = variant { NotFound : record { msg : text } };
+type Error = variant {
+  NotUser;
+  NotFound : record { msg : text };
+  NotItemOwner;
+};
 type Item = record {
   id : nat64;
   updated_at : opt nat64;
+  owner : text;
   name : text;
   description : text;
   created_at : nat64;
@@ -25,13 +30,14 @@ type Result_7 = variant { Ok : vec UserPreference; Err : Error };
 type Result_8 = variant { Ok : vec User; Err : Error };
 type User = record {
   id : nat64;
+  user_principal : text;
   updated_at : opt nat64;
-  password : text;
   name : text;
   created_at : nat64;
   email : text;
+  user_preferences : vec nat64;
 };
-type UserPayload = record { password : text; name : text; email : text };
+type UserPayload = record { name : text; email : text };
 type UserPreference = record {
   id : nat64;
   updated_at : opt nat64;
