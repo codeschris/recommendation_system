@@ -4,7 +4,7 @@ use candid::{Decode, Encode};
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
 use ic_stable_structures::{BoundedStorable, Cell, DefaultMemoryImpl, StableBTreeMap, Storable};
 use std::{borrow::Cow, cell::RefCell};
-use ic_cdk::api::time;
+use ic_cdk::api::{time, caller};
 
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
@@ -13,17 +13,19 @@ type IdCell = Cell<u64, Memory>;
 #[derive(candid::CandidType, Clone, Serialize, Deserialize, Default)]
 struct User {
     id: u64,
+    user_principal: String,
     name: String,
     email: String,
-    password: String,
     created_at: u64,
     updated_at: Option<u64>,
+    user_preferences: Vec<u64>
 }
 
 // struct to represent an item
 #[derive(candid::CandidType, Clone, Serialize, Deserialize, Default)]
 struct Item {
     id: u64,
+    owner: String,
     name: String,
     category: String,
     description: String,
@@ -167,7 +169,6 @@ thread_local! {
 struct UserPayload {
     name: String,
     email: String,
-    password: String,
 }
 
 // item payload
@@ -214,9 +215,8 @@ fn get_user_by_id(id: u64) -> Result<User,Error> {
 // function to add user
 #[ic_cdk::update]
 fn add_user(payload: UserPayload) -> Result<User,Error> {
-
     // validate user payload all fields are required
-    if payload.name.is_empty() || payload.email.is_empty() || payload.password.is_empty() {
+    if payload.name.trim().is_empty() || payload.email.trim().is_empty() {
         return Err(Error::NotFound { msg: "All fields are required".to_string() });
     }
     let id = USER_ID_COUNTER
@@ -228,14 +228,31 @@ fn add_user(payload: UserPayload) -> Result<User,Error> {
 
     let user = User {
         id,
+        user_principal: caller().to_string(),
         name: payload.name,
         email: payload.email,
-        password: payload.password,
         created_at: time(),
         updated_at: None,
+        user_preferences: Vec::new()
     };
     USER_STORAGE.with(|m| m.borrow_mut().insert(id, user.clone()));
     Ok(user)
+}
+
+fn is_caller_user_principal(user: &User) -> Result<(),Error>{
+    if user.user_principal != caller().to_string() {
+        return Err(Error::NotUser)
+    }else{
+        Ok(())
+    }
+}
+
+fn is_caller_item_owner(item: &Item) -> Result<(),Error>{
+    if item.owner != caller().to_string() {
+        return Err(Error::NotItemOwner)
+    }else{
+        Ok(())
+    }
 }
 
 // function to update user
@@ -243,15 +260,15 @@ fn add_user(payload: UserPayload) -> Result<User,Error> {
 fn update_user(id: u64, payload: UserPayload) -> Result<User,Error> {
 
     // validate user payload all fields are required
-    if payload.name.is_empty() || payload.email.is_empty() || payload.password.is_empty() {
+    if payload.name.trim().is_empty() || payload.email.trim().is_empty(){
         return Err(Error::NotFound { msg: "All fields are required".to_string() });
     }
 
     match USER_STORAGE.with(|service| service.borrow().get(&id)) {
         Some(mut user) => {
+            is_caller_user_principal(&user)?;
             user.name = payload.name;
             user.email = payload.email;
-            user.password = payload.password;
             user.updated_at = Some(time());
             USER_STORAGE.with(|m| m.borrow_mut().insert(id, user.clone()));
             Ok(user)
@@ -265,6 +282,17 @@ fn update_user(id: u64, payload: UserPayload) -> Result<User,Error> {
 // function to delete user
 #[ic_cdk::update]
 fn delete_user(id: u64) -> Result<(), Error>{
+    let mut user = get_user_by_id(id)?;
+    is_caller_user_principal(&user)?;
+
+    user.user_preferences.iter_mut().for_each(|preference| {
+        let _ = USER_PREFERENCE_STORAGE.with(|service| {
+            service
+                .borrow_mut()
+                .remove(preference)
+        });
+    });
+
     USER_STORAGE.with(|service| {
         service
             .borrow_mut()
@@ -319,7 +347,7 @@ fn get_item_by_id(id: u64) -> Result<Item,Error> {
 fn add_item(payload: ItemPayload) -> Result<Item,Error> {
 
     // validate item payload all fields are required
-    if payload.name.is_empty() || payload.category.is_empty() || payload.description.is_empty() {
+    if payload.name.trim().is_empty() || payload.category.trim().is_empty() || payload.description.trim().is_empty() {
         return Err(Error::NotFound { msg: "All fields are required".to_string() });
     }
     let id = ITEM_ID_COUNTER
@@ -331,6 +359,7 @@ fn add_item(payload: ItemPayload) -> Result<Item,Error> {
 
     let item = Item {
         id,
+        owner: caller().to_string(),
         name: payload.name,
         category: payload.category,
         description: payload.description,
@@ -346,12 +375,13 @@ fn add_item(payload: ItemPayload) -> Result<Item,Error> {
 fn update_item(id: u64, payload: ItemPayload) -> Result<Item,Error> {
 
     // validate item payload all fields are required
-    if payload.name.is_empty() || payload.category.is_empty() || payload.description.is_empty() {
+    if payload.name.trim().is_empty() || payload.category.trim().is_empty() || payload.description.trim().is_empty() {
         return Err(Error::NotFound { msg: "All fields are required".to_string() });
     }
 
     match ITEM_STORAGE.with(|service| service.borrow().get(&id)) {
         Some(mut item) => {
+            is_caller_item_owner(&item)?;
             item.name = payload.name;
             item.category = payload.category;
             item.description = payload.description;
@@ -369,6 +399,8 @@ fn update_item(id: u64, payload: ItemPayload) -> Result<Item,Error> {
 #[ic_cdk::update]
 
 fn delete_item(id: u64) -> Result<(), Error>{
+    let item = get_item_by_id(id)?;
+    is_caller_item_owner(&item)?;
     ITEM_STORAGE.with(|service| {
         service
             .borrow_mut()
@@ -426,6 +458,11 @@ fn add_user_preference(payload: UserPreferencePayload) -> Result<UserPreference,
     if payload.rating == 0 {
         return Err(Error::NotFound { msg: "All fields are required".to_string() });
     }
+    let mut user = get_user_by_id(payload.user_id)?;
+    let _check_if_item_exists = get_item_by_id(payload.item_id)?;
+
+    is_caller_user_principal(&user)?;
+
     let id = USER_PREFERENCE_ID_COUNTER
     .with(|counter| {
         let current_value = *counter.borrow().get();
@@ -441,6 +478,11 @@ fn add_user_preference(payload: UserPreferencePayload) -> Result<UserPreference,
         created_at: time(),
         updated_at: None,
     };
+    // add preference id to user_preferences field of the user
+    user.user_preferences.push(user_preference.id);
+    // save updated user
+    USER_STORAGE.with(|m| m.borrow_mut().insert(user.id, user.clone()));
+
     USER_PREFERENCE_STORAGE.with(|m| m.borrow_mut().insert(id, user_preference.clone()));
     Ok(user_preference)
 }
@@ -453,6 +495,10 @@ fn update_user_preference(id: u64, payload: UserPreferencePayload) -> Result<Use
     if payload.rating == 0 {
         return Err(Error::NotFound { msg: "All fields are required".to_string() });
     }
+
+    let user = get_user_by_id(payload.user_id)?;
+    let _check_if_item_exists = get_item_by_id(payload.item_id)?;
+    is_caller_user_principal(&user)?;
 
     match USER_PREFERENCE_STORAGE.with(|service| service.borrow().get(&id)) {
         Some(mut user_preference) => {
@@ -473,6 +519,10 @@ fn update_user_preference(id: u64, payload: UserPreferencePayload) -> Result<Use
 
 #[ic_cdk::update]
 fn delete_user_preference(id: u64) -> Result<(), Error>{
+    let preference = get_user_preference_by_id(id)?;
+    let mut user = get_user_by_id(preference.user_id)?;
+    is_caller_user_principal(&user)?;
+
     USER_PREFERENCE_STORAGE.with(|service| {
         service
             .borrow_mut()
@@ -481,6 +531,10 @@ fn delete_user_preference(id: u64) -> Result<(), Error>{
                 msg: format!("user preference with id={} not found", id),
             })
     })?;
+    // remove preference id from the user_preferences field of the user
+    user.user_preferences.retain(|preference| preference != &id);
+    // save updated user
+    USER_STORAGE.with(|m| m.borrow_mut().insert(user.id, user.clone()));
     remove_user_preference_from_recommendation_system(id);
     Ok(())
 }
@@ -719,6 +773,8 @@ fn get_user_preferences_in_recommendation_system(recommendation_system_id: u64) 
 #[derive(candid::CandidType, Deserialize, Serialize)]
 enum  Error {
     NotFound { msg: String },
+    NotUser,
+    NotItemOwner,
 }
 
 // Export the candid interface
