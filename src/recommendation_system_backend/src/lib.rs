@@ -6,7 +6,6 @@ use ic_stable_structures::{BoundedStorable, Cell, DefaultMemoryImpl, StableBTree
 use std::{borrow::Cow, cell::RefCell};
 use ic_cdk::api::time;
 
-
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 type IdCell = Cell<u64, Memory>;
 
@@ -20,7 +19,6 @@ struct User {
     updated_at: Option<u64>,
 }
 
-// struct to represent an item
 #[derive(candid::CandidType, Clone, Serialize, Deserialize, Default)]
 struct Item {
     id: u64,
@@ -31,7 +29,6 @@ struct Item {
     updated_at: Option<u64>,
 }
 
-// struct to represent User preferences or interactions with items
 #[derive(candid::CandidType, Clone, Serialize, Deserialize, Default)]
 struct UserPreference {
     id: u64,
@@ -42,24 +39,20 @@ struct UserPreference {
     updated_at: Option<u64>,
 }
 
-// Struct to manage the recommendation system
 #[derive(candid::CandidType, Clone, Serialize, Deserialize, Default)]
 struct RecommendationSystem {
     id: u64,
-    users : Vec<User>,
-    items : Vec<Item>,
-    user_preferences : Vec<UserPreference>,
-    
+    users: Vec<User>,
+    items: Vec<Item>,
+    user_preferences: Vec<UserPreference>,
 }
 
-
-// Implement Storable and BoundedStorable  traits for User
 impl Storable for User {
-    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Owned(Encode!(self).unwrap())
     }
 
-    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Decode!(bytes.as_ref(), Self).unwrap()
     }
 }
@@ -69,13 +62,12 @@ impl BoundedStorable for User {
     const IS_FIXED_SIZE: bool = false;
 }
 
-// Implement Storable and BoundedStorable  traits for Item
 impl Storable for Item {
-    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Owned(Encode!(self).unwrap())
     }
 
-    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Decode!(bytes.as_ref(), Self).unwrap()
     }
 }
@@ -85,14 +77,12 @@ impl BoundedStorable for Item {
     const IS_FIXED_SIZE: bool = false;
 }
 
-// Implement Storable and BoundedStorable  traits for UserPreference
-
 impl Storable for UserPreference {
-    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Owned(Encode!(self).unwrap())
     }
 
-    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Decode!(bytes.as_ref(), Self).unwrap()
     }
 }
@@ -102,14 +92,12 @@ impl BoundedStorable for UserPreference {
     const IS_FIXED_SIZE: bool = false;
 }
 
-// Implement Storable and BoundedStorable  traits for RecommendationSystem
-
 impl Storable for RecommendationSystem {
-    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Owned(Encode!(self).unwrap())
     }
 
-    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Decode!(bytes.as_ref(), Self).unwrap()
     }
 }
@@ -121,13 +109,15 @@ impl BoundedStorable for RecommendationSystem {
 
 // thread memory manager 
 thread_local! {
-    static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> = RefCell::new(
-        MemoryManager::init(DefaultMemoryImpl::default())
-    );
+    static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> =
+        RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
 
     static USER_ID_COUNTER: RefCell<IdCell> = RefCell::new(
-        IdCell::init(MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(0))), 0)
-            .expect("Cannot create a counter")
+        IdCell::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(0))),
+            0,
+        )
+        .expect("Cannot create a counter")
     );
 
     static ITEM_ID_COUNTER: RefCell<IdCell> = RefCell::new(
@@ -162,7 +152,6 @@ thread_local! {
     );
 }
 
-// user payload
 #[derive(candid::CandidType, Clone, Serialize, Deserialize)]
 struct UserPayload {
     name: String,
@@ -170,7 +159,6 @@ struct UserPayload {
     password: String,
 }
 
-// item payload
 #[derive(candid::CandidType, Clone, Serialize, Deserialize)]
 struct ItemPayload {
     name: String,
@@ -178,7 +166,6 @@ struct ItemPayload {
     description: String,
 }
 
-// user preference payload
 #[derive(candid::CandidType, Clone, Serialize, Deserialize)]
 struct UserPreferencePayload {
     user_id: u64,
@@ -186,10 +173,9 @@ struct UserPreferencePayload {
     rating: u64,
 }
 
-
 // function to get all users
 #[ic_cdk::query]
-fn get_users() -> Result<Vec<User>,Error> {
+fn get_users() -> Result<Vec<User>, Error> {
 
     let users = USER_STORAGE.with(|m| m.borrow().iter().map(|(_, v)| v.clone()).collect::<Vec<_>>());
     if users.len() == 0 {
@@ -292,8 +278,7 @@ fn remove_user_from_recommendation_system(user_id: u64){
 
 // function to get all items
 #[ic_cdk::query]
-fn get_items() -> Result<Vec<Item>,Error> {
-
+fn get_items() -> Result<Vec<Item>, Error> {
     let items = ITEM_STORAGE.with(|m| m.borrow().iter().map(|(_, v)| v.clone()).collect::<Vec<_>>());
     if items.len() == 0 {
         return Err(Error::NotFound { msg: "No items found".to_string() });
@@ -396,8 +381,7 @@ fn remove_item_from_recommendation_system(item_id: u64){
 
 // function to get all user preferences
 #[ic_cdk::query]
-fn get_user_preferences() -> Result<Vec<UserPreference>,Error> {
-
+fn get_user_preferences() -> Result<Vec<UserPreference>, Error> {
     let user_preferences = USER_PREFERENCE_STORAGE.with(|m| m.borrow().iter().map(|(_, v)| v.clone()).collect::<Vec<_>>());
     if user_preferences.len() == 0 {
         return Err(Error::NotFound { msg: "No user preferences found".to_string() });
@@ -501,7 +485,7 @@ fn remove_user_preference_from_recommendation_system(user_preference_id: u64){
 
 // function to get all recommendation systems
 #[ic_cdk::query]
-fn get_recommendation_systems() -> Result<Vec<RecommendationSystem>,Error> {
+fn get_recommendation_systems() -> Result<Vec<RecommendationSystem>, Error> {
 
     let recommendation_systems = RECOMMENDATION_SYSTEM_STORAGE.with(|m| m.borrow().iter().map(|(_, v)| v.clone()).collect::<Vec<_>>());
     if recommendation_systems.len() == 0 {
@@ -716,10 +700,9 @@ fn get_user_preferences_in_recommendation_system(recommendation_system_id: u64) 
 
 
 
-#[derive(candid::CandidType, Deserialize, Serialize)]
-enum  Error {
+#[#[derive(candid::CandidType, Deserialize, Serialize)]
+enum Error {
     NotFound { msg: String },
 }
 
-// Export the candid interface
 ic_cdk::export_candid!();
